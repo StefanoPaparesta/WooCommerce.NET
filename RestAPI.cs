@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading.Tasks;
+
 using WooCommerceNET.Base;
 
 namespace WooCommerceNET
@@ -82,21 +81,35 @@ namespace WooCommerceNET
                             Action<HttpWebResponse> responseFilter = null)//, bool useProxy = false)
         {
             if (string.IsNullOrEmpty(url))
+            {
                 throw new Exception("Please use a valid WooCommerce Restful API url.");
+            }
 
             string urlLower = url.Trim().ToLower().TrimEnd('/');
             if (urlLower.EndsWith("wc-api/v1") || urlLower.EndsWith("wc-api/v2") || urlLower.EndsWith("wc-api/v3"))
+            {
                 Version = APIVersion.Legacy;
+            }
             else if (urlLower.EndsWith("wp-json/wc/v1"))
+            {
                 Version = APIVersion.Version1;
+            }
             else if (urlLower.EndsWith("wp-json/wc/v2"))
+            {
                 Version = APIVersion.Version2;
+            }
             else if (urlLower.EndsWith("wp-json/wc/v3"))
+            {
                 Version = APIVersion.Version3;
+            }
             else if (urlLower.Contains("wp-json/wc-"))
+            {
                 Version = APIVersion.ThirdPartyPlugins;
+            }
             else if (urlLower.EndsWith("wp-json/wp/v2") || urlLower.EndsWith("wp-json"))
+            {
                 Version = APIVersion.WordPressAPI;
+            }
             else if (urlLower.EndsWith("jwt-auth/v1/token"))
             {
                 Version = APIVersion.WordPressAPIJWT;
@@ -114,9 +127,13 @@ namespace WooCommerceNET
 
             //Why extra '&'? look here: https://wordpress.org/support/topic/woocommerce-rest-api-v3-problem-woocommerce_api_authentication_error/
             if ((url.ToLower().Contains("wc-api/v3") || !IsLegacy) && !wc_url.StartsWith("https", StringComparison.OrdinalIgnoreCase) && !(Version == APIVersion.WordPressAPI || Version == APIVersion.WordPressAPIJWT))
+            {
                 wc_secret = secret + "&";
+            }
             else
+            {
                 wc_secret = secret;
+            }
 
             jsonSeFilter = jsonSerializeFilter;
             jsonDeseFilter = jsonDeserializeFilter;
@@ -157,7 +174,9 @@ namespace WooCommerceNET
                 if (Version == APIVersion.WordPressAPI)
                 {
                     if (string.IsNullOrEmpty(oauth_token) || string.IsNullOrEmpty(oauth_token_secret))
+                    {
                         throw new Exception($"oauth_token and oauth_token_secret parameters are required when using WordPress REST API.");
+                    }
                 }
 
                 if ((Version == APIVersion.WordPressAPIJWT || WCAuthWithJWT) && JWT_Object == null)
@@ -170,7 +189,9 @@ namespace WooCommerceNET
                     request.ContentType = "application/x-www-form-urlencoded";
 
                     if (JWTRequestFilter != null)
+                    {
                         JWTRequestFilter.Invoke(request);
+                    }
 
                     var buffer = Encoding.UTF8.GetBytes($"username={wc_key}&password={WebUtility.UrlEncode(wc_secret)}");
                     using (Stream dataStream = await request.GetRequestStreamAsync().ConfigureAwait(false))
@@ -182,7 +203,9 @@ namespace WooCommerceNET
                     string result = await GetStreamContent(resStream, "UTF-8").ConfigureAwait(false);
 
                     if (JWTDeserializeFilter != null)
+                    {
                         result = JWTDeserializeFilter.Invoke(result);
+                    }
 
                     JWT_Object = DeserializeJSon<WP_JWT_Object>(result);
                 }
@@ -193,19 +216,30 @@ namespace WooCommerceNET
                     {
                         httpWebRequest = (HttpWebRequest)WebRequest.Create(wc_url + GetOAuthEndPoint(method.ToString(), endpoint, parms));
                         if (WCAuthWithJWT && JWT_Object != null)
+                        {
                             httpWebRequest.Headers["Authorization"] = "Bearer " + JWT_Object.token;
+                        }
                         else
+                        {
                             httpWebRequest.Headers["Authorization"] = "Basic " + Convert.ToBase64String(Encoding.GetEncoding("ISO-8859-1").GetBytes(wc_key + ":" + wc_secret));
+                        }
                     }
                     else
                     {
                         if (parms == null)
+                        {
                             parms = new Dictionary<string, string>();
+                        }
 
                         if (!parms.ContainsKey("consumer_key"))
+                        {
                             parms.Add("consumer_key", wc_key);
+                        }
+
                         if (!parms.ContainsKey("consumer_secret"))
+                        {
                             parms.Add("consumer_secret", wc_secret);
+                        }
 
                         httpWebRequest = (HttpWebRequest)WebRequest.Create(wc_url + GetOAuthEndPoint(method.ToString(), endpoint, parms));
                     }
@@ -214,7 +248,9 @@ namespace WooCommerceNET
                 {
                     httpWebRequest = (HttpWebRequest)WebRequest.Create(wc_url + GetOAuthEndPoint(method.ToString(), endpoint, parms));
                     if (Version == APIVersion.WordPressAPIJWT)
+                    {
                         httpWebRequest.Headers["Authorization"] = "Bearer " + JWT_Object.token;
+                    }
                 }
 
                 // start the stream immediately
@@ -222,7 +258,9 @@ namespace WooCommerceNET
                 httpWebRequest.AllowReadStreamBuffering = false;
 
                 if (webRequestFilter != null)
+                {
                     webRequestFilter.Invoke(httpWebRequest);
+                }
 
                 //if (wc_Proxy)
                 //    httpWebRequest.Proxy.Credentials = CredentialCache.DefaultCredentials;
@@ -276,19 +314,29 @@ namespace WooCommerceNET
                 WebResponse wr = await httpWebRequest.GetResponseAsync().ConfigureAwait(false);
 
                 if (webResponseFilter != null)
+                {
                     webResponseFilter.Invoke((HttpWebResponse)wr);
+                }
 
                 return await GetStreamContent(wr.GetResponseStream(), wr.ContentType.Contains("=") ? wr.ContentType.Split('=')[1] : "UTF-8").ConfigureAwait(false);
             }
             catch (WebException we)
             {
                 if (httpWebRequest != null && httpWebRequest.HaveResponse)
+                {
                     if (we.Response != null)
+                    {
                         throw new WebException(await GetStreamContent(we.Response.GetResponseStream(), we.Response.ContentType.Contains("=") ? we.Response.ContentType.Split('=')[1] : "UTF-8").ConfigureAwait(false), we.InnerException, we.Status, we.Response);
+                    }
                     else
+                    {
                         throw we;
+                    }
+                }
                 else
+                {
                     throw we;
+                }
             }
             catch (Exception e)
             {
@@ -326,22 +374,28 @@ namespace WooCommerceNET
             if (Version == APIVersion.WordPressAPIJWT || (wc_url.StartsWith("https", StringComparison.OrdinalIgnoreCase) && Version != APIVersion.WordPressAPI))
             {
                 if (parms == null)
+                {
                     return endpoint;
+                }
                 else
                 {
                     string requestParms = string.Empty;
                     foreach (var parm in parms)
+                    {
                         requestParms += parm.Key + "=" + parm.Value + "&";
+                    }
 
                     return endpoint + "?" + requestParms.TrimEnd('&');
                 }
             }
-            
+
             Dictionary<string, string> dic = new Dictionary<string, string>();
             dic.Add("oauth_consumer_key", wc_key);
 
             if (Version == APIVersion.WordPressAPI)
+            {
                 dic.Add("oauth_token", oauth_token);
+            }
 
             dic.Add("oauth_nonce", Guid.NewGuid().ToString("N"));
             dic.Add("oauth_signature_method", "HMAC-SHA256");
@@ -349,25 +403,37 @@ namespace WooCommerceNET
             dic.Add("oauth_version", "1.0");
 
             if (parms != null)
+            {
                 foreach (var p in parms)
+                {
                     dic.Add(p.Key, p.Value);
+                }
+            }
 
             string base_request_uri = method.ToUpper() + "&" + Uri.EscapeDataString(wc_url + endpoint) + "&";
             string stringToSign = string.Empty;
 
             foreach (var parm in dic.OrderBy(x => x.Key))
+            {
                 stringToSign += Uri.EscapeDataString(parm.Key) + "=" + Uri.EscapeDataString(parm.Value) + "&";
+            }
 
             base_request_uri = base_request_uri + Uri.EscapeDataString(stringToSign.TrimEnd('&'));
 
             if (Version == APIVersion.WordPressAPI)
+            {
                 dic.Add("oauth_signature", Common.GetSHA256(wc_secret + "&" + oauth_token_secret, base_request_uri));
+            }
             else
+            {
                 dic.Add("oauth_signature", Common.GetSHA256(wc_secret, base_request_uri));
-            
+            }
+
             string parmstr = string.Empty;
             foreach (var parm in dic)
+            {
                 parmstr += parm.Key + "=" + Uri.EscapeDataString(parm.Value) + "&";
+            }
 
             return endpoint + "?" + parmstr.TrimEnd('&');
         }
@@ -407,15 +473,23 @@ namespace WooCommerceNET
             }
 
             if (IsLegacy)
+            {
                 if (typeof(T).IsArray)
+                {
                     jsonString = "{\"" + typeof(T).Name.ToLower().Replace("[]", "s") + "\":" + jsonString + "}";
+                }
                 else
+                {
                     jsonString = "{\"" + typeof(T).Name.ToLower() + "\":" + jsonString + "}";
+                }
+            }
 
             stream.Dispose();
 
             if (jsonSeFilter != null)
+            {
                 jsonString = jsonSeFilter.Invoke(jsonString);
+            }
 
             return jsonString;
         }
@@ -423,14 +497,18 @@ namespace WooCommerceNET
         public virtual T DeserializeJSon<T>(string jsonString)
         {
             if (jsonDeseFilter != null)
+            {
                 jsonString = jsonDeseFilter.Invoke(jsonString);
+            }
 
             Type dT = typeof(T);
 
             try
             {
                 if (dT.Name.EndsWith("List"))
+                {
                     dT = dT.GetTypeInfo().DeclaredProperties.First().PropertyType.GenericTypeArguments[0];
+                }
 
                 if (dT.FullName.StartsWith("System.Collections.Generic.List"))
                 {
@@ -457,9 +535,13 @@ namespace WooCommerceNET
             catch (Exception ex)
             {
                 if (Debug)
+                {
                     throw new Exception(ex.Message + Environment.NewLine + Environment.NewLine + jsonString);
+                }
                 else
+                {
                     throw ex;
+                }
             }
         }
 

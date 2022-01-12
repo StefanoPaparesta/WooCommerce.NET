@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+
 using WooCommerceNET.Base;
 
 namespace WooCommerceNET.WooCommerce.v2
@@ -421,6 +422,8 @@ namespace WooCommerceNET.WooCommerce.v2
         [DataMember(EmitDefaultValue = false)]
         public string country { get; set; }
 
+        [DataMember(EmitDefaultValue = false)]
+        public string phone { get; set; }
     }
 
     [DataContract]
